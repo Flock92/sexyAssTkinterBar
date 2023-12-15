@@ -16,6 +16,9 @@ from tkinter.font import Font
 from customtkinter.windows.widgets.font import CTkFont
 from customtkinter.windows.widgets.image import CTkImage
 
+
+# FIX ERROR WHERE BAR STILL SHOWS IF FULLSCREEN WINDOW IS BROUGHT INFRONT
+
 class SexyAssExceptions(Exception):
 
     def __init__(self, msg: str, *args: object) -> None:
@@ -52,7 +55,7 @@ class SexyAssBar(CTkToplevel):
         self.attributes('-toolwindow', True)
 
         # Bring toplevel to front
-        self.attributes('-topmost', 'true')
+        #self.attributes('-topmost', 'true')
 
         # Remove background from topleve window
         bg_color = self["background"]
@@ -74,12 +77,14 @@ class SexyAssBar(CTkToplevel):
 
         self.master.bind("<FocusIn>", self.__master_focus, add=True)
 
-        self.bind("<FocusOut>", self.__title_focus, add=True)
+        self.bind("<FocusOut>", self.__master_focus, add=True)
 
-        self.bind("<FocusIn>", self.__title_focus, add=True)
+        self.bind("<FocusIn>", self.__master_focus, add=True)
 
     def __locator(self, e: Event = None):
         """relocate top level"""
+
+        self.lift()
 
         __root_x = self.master.winfo_x()
         __root_y = self.master.winfo_y()
@@ -92,6 +97,8 @@ class SexyAssBar(CTkToplevel):
     def __frame(self, e: Event = None):
         """Add a frame to top level"""
 
+        # print("__Frame")
+
         self.main_frame = CTkFrame(master=self, fg_color="transparent", bg_color="transparent", height=30)
         self.main_frame.pack_propagate(False)
         self.main_frame.pack_configure(side="top", fill="x")
@@ -101,7 +108,9 @@ class SexyAssBar(CTkToplevel):
     
     def __map_tool_bar(self, e: Event = None) -> None:
         """React to changes in root size"""
-        
+
+        # print("__map_tool_bar")
+
         state = self.master.state() # Get roots state
 
         items = self.main_frame.winfo_children()
@@ -123,12 +132,16 @@ class SexyAssBar(CTkToplevel):
 
         self.__locator()
 
+        # self.lift(aboveThis=self.master)
+
         del items
 
         return
 
     def __unmap_tool_bar(self, e: Event = None) -> None:
         """Unmap tool bar when root is minimised"""
+
+        # print("__unmap_tool_bar")
 
         self.state(newstate="withdraw")
 
@@ -138,40 +151,11 @@ class SexyAssBar(CTkToplevel):
             pass
 
         return
-
+    
     def __master_focus(self, e: Event = None):
         """if window no focus check if tool bar focus"""
 
-        # Get focus information
-        bar_focus = self.focus_displayof()
-        root_focus = self.master.focus_displayof()
-
-        topmost = self.attributes("-topmost")
-
-        if root_focus == None and bar_focus == None:
-
-            if root_focus == None and bar_focus == None:
-                # Close dropmenu if focuse is lost
-                try:
-                    if self.__menu_container:
-                        self.__destroy_menu()
-                except AttributeError:
-                    pass
-
-            # remove topmost from bar and focus
-            self.focus()
-            self.attributes('-topmost', 'false')
-        
-        else:
-
-            if topmost == 0:
-
-                self.attributes('-topmost', 'true')
-
-        return
-    
-    def __title_focus(self, e: Event = None):
-        """if title bar not in focus check window"""
+        # print("__master focus")
 
         # Get focus information
         bar_focus = self.focus_displayof()
@@ -180,34 +164,52 @@ class SexyAssBar(CTkToplevel):
         topmost = self.attributes("-topmost")
 
         if root_focus == None and bar_focus == None:
+            
+            # Close dropmenu if focuse is lost
+            try:
+                if self.__menu_container:
+                    self.__destroy_menu(e=e)
 
-            if root_focus == None and bar_focus == None:
-                # Close dropmenu if focuse is lost
-                try:
-                    if self.__menu_container:
-                        self.__destroy_menu()
-                except AttributeError:
-                    pass
+                return
+            except AttributeError:
+                pass
 
-            # remove topmost from bar and focus
-            self.focus()
-            self.attributes('-topmost', 'false')
-        
-        else:
+            # Check if pointer is in window if not stop being topmost
+            # print("changed top most")
+            #self.attributes('-topmost', 'false')
+            #self.lift(aboveThis=self.master)
+            
+            # self.master.lift(aboveThis=self)
+
+        elif root_focus != None or bar_focus != None:
+
+            # print("checking if top most")
 
             if topmost == 0:
-                self.attributes('-topmost', 'true')
+                pass
+
+                # print("now top most")
+
+                #self.lift(aboveThis=self.master)
+
+                #self.attributes('-topmost', 'true')
 
         return
     
     def __menu_locator(self, title: str) -> None:
         """locate the menu title to ensure the dropmenu opens in correct place"""
 
+        # print("__menu_locator")
+
         try:
-            if not self.__menu_container:
-                return
+            self.__menu_container
         except AttributeError as em:
-            pass
+            # print("container doesnt exist")
+            return
+        
+        limit = 1
+        
+        # print("container exsit")
 
         state = self.master.state()
 
@@ -231,37 +233,85 @@ class SexyAssBar(CTkToplevel):
             except Exception:
                 pass
             
-    def __destroy_menu(self, e: Event = None):
+    def __sub_menu_locator(self, label: str) -> None:
+        """"""
+
+        try:
+            self.__menu_container
+        except AttributeError as em:
+            return
+        
+        state = self.master.state()
+
+        __bar_x = self.winfo_x()
+        __bar_y = self.winfo_y()
+
+        __title_x = self.__menu_object[f"{label}_menu"]["title"].winfo_x()
+        __title_y = self.__menu_object[f"{label}_menu"]["title"].winfo_y()
+
+        __absolute_x = __bar_x + __title_x
+        __absolute_y = __bar_y + __title_y
+
+        if state == "normal":
+            try:
+                self.__menu_container.geometry(f"+{__absolute_x}+{__absolute_y+25}")
+            except Exception:
+                pass
+        elif state == "zoomed":
+            try:
+                self.__menu_container.geometry(f"+{__absolute_x}+{__absolute_y+25}")
+            except Exception:
+                pass
+    
+    def __destroy_menu(self, e: CTk = None):
         """destroy open menu"""
-        if self.__menu_container:
-            self.__menu_container.destroy()
-            self.__menu_container.update()
-            self.__open_menu = None
-            del self.__menu_container
+
+        print(self.__menu_container.winfo_id())
+
+        self.lift()
+
+        try:
+            menu = self.__menu_container
+        except AttributeError:
+            return
+        
+        menu.destroy()
+        #menu.update()
+        
+        self.__open_menu = None
+        del self.__menu_container
 
         return
     
     def __hover_load(self, e: Event, title: str):
         """only allow hover load if a menu is open"""
+
+        # print("__hover_load")
+
         try:
             if type(e.widget) == Label:
                 requested = e.widget.cget("text")
-                if self.__menu_container and requested != self.__open_menu:
+                if self.__open_menu != None and requested != self.__open_menu:
                     self.__load_menu(e=e, title=title)
         except AttributeError:
             return
 
-    def __load_menu(self, e, title: str):
+    def __load_menu(self, e: Event, title: str):
         """"""
+
+        # print("__load_menu")
 
         try:
             if self.__menu_container:
-                current = e.widget.cget("text")
-                if current == self.__open_menu:
-                    self.__destroy_menu()
-                    return
-                else:
-                    self.__destroy_menu()
+                # print("self.__menu_container located")
+                if type(e.widget) == Label:
+                    current = e.widget.cget("text")
+                    # print(current)
+                    if current == self.__open_menu:
+                        self.__destroy_menu(e=e)
+                        return
+                    else:
+                        self.__destroy_menu(e=e)
         except AttributeError:
             pass
 
@@ -272,7 +322,8 @@ class SexyAssBar(CTkToplevel):
 
         self.__menu_container.overrideredirect(1)
 
-        self.__menu_container.attributes('-topmost', 'true')
+        self.__menu_container.lift(aboveThis=self)
+        #self.__menu_container.attributes('-topmost', 'true')
         
         self.__menu_container.attributes('-toolwindow', True)
 
@@ -282,7 +333,8 @@ class SexyAssBar(CTkToplevel):
 
         self.__menu_locator(title=title)
 
-        self.master.bind("<Button-1>", lambda e: self.__destroy_menu(e=e))
+        # self.master.bind("<Button-1>", lambda e: self.__destroy_menu(e=e))
+        self.__menu_container.bind("<FocusOut>", lambda e: self.__destroy_menu(e=e))
 
         self.bind("<Configure>", lambda e: self.__menu_locator(title=title))
 
@@ -309,7 +361,7 @@ class SexyAssBar(CTkToplevel):
 
             # Check for shortcut
             shortcut = None
-            submenu = False
+            suboption = False
 
             try:
                 shortcut = option[f"shortCut"]
@@ -317,9 +369,18 @@ class SexyAssBar(CTkToplevel):
                 pass
 
             try:
-                submenu = option[f"subMenu"]
+                suboption = option[f"sub"]
             except KeyError:
                 pass
+
+            try:
+                subMenu = option[f"subMenu"]
+            except KeyError:
+                pass
+
+            command = option["command"]
+
+            print("printing command",command)
 
             button_frame = CTkFrame(master=panel, width=300)
             button_frame.pack_propagate(False)
@@ -329,25 +390,34 @@ class SexyAssBar(CTkToplevel):
 
             item = self.MenuBtn(master=button_frame, title=text, hover_color=self.item_hover_color, 
                            short_cut=shortcut, bg_color=self.menu_fg_color, font=self.options_font, 
-                           sub_menu=submenu)
+                           sub_menu=suboption, _command=command)
             
             item.grid_configure(row=0, column=0)
             item.grid()
 
-        self.__open_menu = title    
+            item.bind("<Enter>", lambda e: e.widget.focus(), add=True)
+            item.bind("<Leave>", lambda e: self.__menu_container.focus(), add=True)
+
+        self.__open_menu = title   
+
+        return
+
+    def __load_sub(self):
+
+        pass
 
     def add_search_bar(self, placeholder: str = "Search", width: int = 300, **kwargs):
 
         if hasattr(self, "__search_field") == True:
             return
 
-        __search_field = CTkEntry(master=self.main_frame, placeholder_text=placeholder, **kwargs, 
+        self.__search_field = CTkEntry(master=self.main_frame, placeholder_text=placeholder, **kwargs, 
                                   height=20, width=width, font=self.search_font)
-        __search_field.pack_configure(side="left", padx=(5,5), pady=(5,5))
-        __search_field.pack()
+        self.__search_field.pack_configure(side="left", padx=(5,5), pady=(5,5))
+        self.__search_field.pack()
 
-        __search_field.bind("<Button-1>", self.__destroy_menu)
-        __search_field.bind("<FocusOut>", __search_field.update())
+        self.__search_field.bind("<Button-1>", self.__destroy_menu)
+        self.__search_field.bind("<FocusOut>", self.__search_field.update())
 
         return
     
@@ -397,6 +467,7 @@ class SexyAssBar(CTkToplevel):
             msg = f"incorrect selection: _{select}: accepted ['title', 'search', 'option'] "
             raise SexyAssExceptions(msg=msg)
         
+
     class Add_options:
 
         def __init__(self, menu_object: list, title: str):
@@ -412,12 +483,15 @@ class SexyAssBar(CTkToplevel):
             """Return menu lenght"""
             return len(self.menu_object)
 
-        def add_option(self, label: str, short_cut: str = None, sub_menu: bool = False, **kwargs):
+        def add_option(self, label: str, short_cut: str = None, sub_menu: bool = False, command = None, **kwargs):
             """Add option to menu"""
 
-            __item = {"title":label, "shortCut":short_cut, "subMenu":sub_menu}
+            __item = {"title":label, "shortCut":short_cut, "sub":sub_menu, "subMenu": [], "command": command}
 
             self.menu_object.append(__item)
+
+            if sub_menu == True and short_cut == None:
+                return self.Add_SubMenu(sub_menu_object=__item["subMenu"], title=label)
 
             return
 
@@ -434,12 +508,60 @@ class SexyAssBar(CTkToplevel):
                     self.menu_object.insert(loc,indicator)
                 except IndexError as em:
                     raise em
-                
+            
+            return
+        
+        class Add_SubMenu:
+
+            def __init__(self, sub_menu_object: list, title: str):
+                """"""
+                self.menu_object = sub_menu_object
+                self.title = title
+
+            def __str__(self) -> str:
+                """return menu title"""
+                return self.title
+
+            def __len__(self):
+                """Return menu lenght"""
+                return len(self.menu_object)
+
+            def add_option(self, label: str, short_cut: str = None, sub_menu: bool = False, command = None, **kwargs):
+                """Add option to menu"""
+
+                __item = {"title":label, "shortCut":short_cut, "sub":sub_menu, "subMenu": [], "command": command}
+
+                self.menu_object.append(__item)
+
+                if sub_menu == True and short_cut == None:
+                    return type(self)(sub_menu_object=__item["subMenu"], title=label)
+
+                return
+
+            def add_separator(self, loc: int = None) -> None:
+                """adds a separator to the list"""
+
+                indicator = "-sep-"
+
+                if loc == None:
+                    self.sub_menu_object.append(indicator)
+
+                else:
+                    try:
+                        self.sub_menu_object.insert(loc,indicator)
+                    except IndexError as em:
+                        raise em
+
+                return
+            
+             
     class MenuBtn(CTkFrame):
 
         def __init__(self, master: any, title: str, hover_color: str, font: tuple, short_cut: str = None, 
-                     sub_menu: bool = False, **kwargs):
+                     sub_menu: bool = False, _command = None, **kwargs):
             super().__init__(master, **kwargs)
+
+            print(_command)
 
             if short_cut == None or sub_menu == False:
                 width = 200
@@ -461,18 +583,35 @@ class SexyAssBar(CTkToplevel):
             self.columnconfigure(0, weight=1)
 
             btn_label = CTkLabel(master=self, fg_color="transparent", text=title, anchor="w", font=font)
-            btn_label.grid_configure(row=0, column=0, padx=(5,5), pady=(5,5), sticky="w")
+            btn_label.grid_configure(row=0, column=0, padx=(20,5), pady=(5,5), sticky="w")
             btn_label.grid()
 
             if short_cut != None and isinstance(short_cut, str) == True:
                 short_cut_label = CTkLabel(master=self, fg_color="transparent", bg_color=color, 
                                            text=short_cut, anchor="e", font=font, height=20)
-                short_cut_label.grid_configure(row=0, column=1, padx=(5,5), pady=(5,5))
+                short_cut_label.grid_configure(row=0, column=1, padx=(5,20), pady=(5,5))
                 short_cut_label.grid()
 
-            self.bind("<Enter>", lambda e: self.configure(fg_color=hover_color))
-            self.bind("<Leave>", lambda e: self.configure(fg_color=color))
+                # create submenu container
 
-            btn_label.bind("<Enter>", lambda e: self.configure(fg_color=hover_color))
-            btn_label.bind("<Leave>", lambda e: self.configure(fg_color=color))
-        
+                # add binding
+
+            if sub_menu == True:
+                sub_label = CTkLabel(master=self, fg_color="transparent", bg_color=color, 
+                                           text=">", anchor="e", font=font, height=20)
+                sub_label.grid_configure(row=0, column=1, padx=(5,10), pady=(5,5))
+                sub_label.grid()
+
+                # Create a sub window and add options
+
+            self.bind("<Enter>", lambda e: self.configure(fg_color=hover_color), add=True)
+            self.bind("<Leave>", lambda e: self.configure(fg_color=color), add=True)
+
+            btn_label.bind("<Enter>", lambda e: self.configure(fg_color=hover_color), add=True)
+            btn_label.bind("<Leave>", lambda e: self.configure(fg_color=color), add=True)
+
+            if _command != None:
+                print("adding command \n")
+                self.bind("<Button-1>", command=lambda e: _command(e), add=True)
+                btn_label.bind("<Button-1>", command=lambda e: _command(e), add=True)
+                
